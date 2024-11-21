@@ -24,6 +24,70 @@ def healthcheck():
     app.logger.info('Health Check')
     return make_response(jsonify(res), http.HTTPStatus.OK)
 
+# Authentication
+@app.route('/auth/login', methods=['POST'])
+def login():
+    '''
+    Login endpoint to authenticate the user
+    
+    Returns:
+        JSON response indicating the status of the login
+    '''
+    pass
+
+@app.route('/auth/create-account', methods=['POST'])
+def register():
+    '''
+    Register endpoint to create a new user
+    
+    Returns:
+        JSON response indicating the status of the registration
+    '''
+    pass
+
+@app.route('/auth/change-password', methods=['PATCH'])
+
+# Stock Management
+@app.route('/stocks/buy', methods=['POST'])
+def buy_stock():
+    '''
+    Buy endpoint to purchase stock
+    
+    Returns:
+        JSON response indicating the status of the purchase
+    '''
+    pass
+
+@app.route('/stocks/sell', methods=['POST'])
+def sell_stock():
+    '''
+    Sell endpoint to sell stock
+    
+    Returns:
+        JSON response indicating the status of the sale
+    '''
+    pass
+
+@app.route('/stocks/quote/<stock>', methods=['GET'])
+def get_stock_quote(stock):
+    '''
+    Get stock quote for a given stock
+    
+    Returns:
+        JSON response containing the stock quote
+    '''
+    pass
+
+@app.route('/stocks/portfolio', methods=['GET'])
+def get_portfolio():
+    '''
+    Get the portfolio of the user
+    
+    Returns:
+        JSON response containing the user's portfolio
+    '''
+    pass
+
 if __name__ == '__main__':
     # check if HTTP variables are set in the environment
     if os.getenv('HTTP_HOST'):
