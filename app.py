@@ -3,6 +3,8 @@ import http
 import os
 from flask import Flask, jsonify, make_response, Response, request
 
+from utils.stocks import quote_stock_by_symbol
+
 # Load environment variables
 load_dotenv()
 
@@ -76,7 +78,11 @@ def get_stock_quote(stock):
     Returns:
         JSON response containing the stock quote
     '''
-    pass
+    try:
+        quote = quote_stock_by_symbol(stock)
+        return make_response(jsonify(quote), http.HTTPStatus.OK)
+    except ValueError:
+        return make_response(jsonify({'error': 'Invalid stock symbol'}), http.HTTPStatus.BAD_REQUEST)
 
 @app.route('/stocks/portfolio', methods=['GET'])
 def get_portfolio():

@@ -1,2 +1,5 @@
 .env
+paper_trader_venv
+.pytest_cache
+__pycache__
 db
