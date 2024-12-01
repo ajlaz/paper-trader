@@ -5,7 +5,8 @@ IMAGE_NAME="paper-trader"
 CONTAINER_TAG="latest"
 HOST_PORT=5002 # host port
 HTTP_PORT=5002 # container port
-BUILD=true # build image
+DB_VOLUME_PATH="./db"   # Adjust this to the desired host path for the database persistence
+BUILD=true  # Set this to true if you want to build the image
 
 # Check if we need to build the Docker image
 if [ "$BUILD" = true ]; then
@@ -13,6 +14,12 @@ if [ "$BUILD" = true ]; then
     docker build --build-arg HTTP_PORT=${HTTP_PORT} -t ${IMAGE_NAME}:${CONTAINER_TAG} .
 else
   echo "Skipping Docker image build..."
+fi
+
+# Check if the database directory exists; if not, create it
+if [ ! -d "${DB_VOLUME_PATH}" ]; then
+  echo "Creating database directory at ${DB_VOLUME_PATH}..."
+  mkdir -p ${DB_VOLUME_PATH}
 fi
 
 # Stop and remove the running container if it exists
@@ -38,6 +45,7 @@ docker run -d \
   --name ${IMAGE_NAME}_container \
   --env-file .env \
   -p ${HOST_PORT}:${HTTP_PORT} \
+  -v ${DB_VOLUME_PATH}:/app/db \
   ${IMAGE_NAME}:${CONTAINER_TAG}
 
 echo "Docker container is running on port ${HOST_PORT}."
