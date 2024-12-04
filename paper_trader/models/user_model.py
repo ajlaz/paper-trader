@@ -6,4 +6,6 @@ class User:
     username: str
     password: str
     balance: float
+
+
     

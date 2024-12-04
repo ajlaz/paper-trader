@@ -3,12 +3,17 @@ import http
 import os
 from flask import Flask, jsonify, make_response, Response, request
 
+from paper_trader.models import user_stock_model
+from paper_trader.models.user_model import UserModel
 from utils.stocks import quote_stock_by_symbol
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
+
+# Initialize the UserModel
+user_model = UserModel()
 
 # Health Checks
 @app.route('/health', methods=['GET'])
@@ -31,23 +36,72 @@ def healthcheck():
 def login():
     '''
     Login endpoint to authenticate the user
+
+    Expects:
+        JSON body with 'username' and 'password'
     
     Returns:
         JSON response indicating the status of the login
     '''
-    pass
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    user = user_model.find_user_by_user(username)
+    if user and user.password == password:
+        app.logger.info('User %s logged in successfully.', username)
+        return make_response(jsonify({'message': 'Login successfully'}), http.HTTPStatus.OK)
+    app.logger.warning('Login failed for username: %s', username)
+    return make_response(jsonify({'error': 'Invalid username or password'}), http.HTTPStatus.UNAUTHORIZED)
 
 @app.route('/auth/create-account', methods=['POST'])
 def register():
     '''
     Register endpoint to create a new user
+
+    Expects: 
+        JSON body with 'username', 'password', and optional 'balance'
     
     Returns:
         JSON response indicating the status of the registration
     '''
-    pass
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    balance = data.get('balance', 100000.0)
+
+    if user_model.find_user_by_username(username):
+        app.logger.warning('Registration failed: username %s already exists.', username)
+        return make_response(jsonify({'error': 'Username already exists'}), http.HTTPStatus.BAD_REQUEST)
+    
+    user = user_model.create_user(username, password, balance)
+    app.logger.info('User %s created successfully.', username)
+    return make_response(jsonify({'message': 'User created successfully', 'user_id': user.id}), http.HTTPStatus.CREATED)
 
 @app.route('/auth/change-password', methods=['PATCH'])
+def change_password():
+    '''
+    Change password endpoint for an existing user.
+    
+    Expects:
+        JSON body with 'username', 'old_password', and 'new_password'
+
+    Returns:
+        JSON response indicating the status of the password change
+    '''
+    
+    data = request.get_json()
+    username = data.get('username')
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+
+    user = user_model.find_user_by_username(username)
+    if user and user.password == old_password:
+        user_model.update_password(user.id, new_password)
+        app.logger.info('Password updated for user %s.', username)
+        return make_response(jsonify({'message': 'Password updated successfully'}), http.HTTPStatus.OK)
+    app.logger.warning('Password change failed for username: %s', username)
+    return make_response(jsonify({'error': 'Invalid username or password'}), http.HTTPStatus.UNAUTHORIZED)
 
 # Stock Management
 @app.route('/stocks/buy', methods=['POST'])
