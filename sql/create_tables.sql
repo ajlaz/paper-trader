@@ -2,7 +2,7 @@ DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS user_stocks;
 
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     username VARCHAR(255) NOT NULL,
     password VARCHAR(255) NOT NULL,
     balance DECIMAL(11, 2) DEFAULT 100000.00,
@@ -11,7 +11,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE user_stocks (
-    id SERIAL PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INT NOT NULL,
     symbol VARCHAR(255) NOT NULL,
     bought_price DECIMAL(11, 2) NOT NULL,
