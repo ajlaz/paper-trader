@@ -11,7 +11,7 @@ configure_logger(logger)
 
 
 # load the db path from the environment with a default value
-DB_PATH = os.getenv("DB_PATH", "/app/sql/paper_trader.db")
+DB_PATH = os.getenv("DB_PATH", "/app/db/paper-trader.db")
 
 
 def check_database_connection():
