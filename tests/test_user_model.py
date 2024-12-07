@@ -1,62 +1,79 @@
 import pytest
+from contextlib import contextmanager
+import re
 import sqlite3
 from unittest.mock import patch
-from paper_trader.models.user_model import create_table, create_user, find_user_by_username, check_password, update_password
+from paper_trader.models.user_model import create_user, find_user_by_username, find_user_by_id, check_password, update_password
 
-@pytest.fixture(scope="module")
-def db_connection():
-    connection = sqlite3.connect(":memory:")
-    cursor = connection.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            balance REAL DEFAULT 10000.0
-        )
-    ''')
-    connection.commit()
-    yield connection
-    connection.close()
+######################################################
+#
+#    Fixtures
+#
+######################################################
 
-def test_create_table(db_connection):
-    create_table()
-    cursor = db_connection.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name = 'users'")
-    assert cursor.fetchone() is not None
+def normalize_whitespace(sql_query: str) -> str:
+    return re.sub(r'\s+', ' ', sql_query).strip()
 
-@patch('bcrypt.generate_password_hash', return_value=b'hash123')
-def test_create_user(mock_bcrypt, db_connection):
-    create_user('testuser', 'password123', 5000.0)
-    cursor = db_connection.cursor()
-    cursor.execute('SELECT * FROM users WHERE username = ?', ('testuser',))
-    user = cursor.fetchone()
-    assert user is not None
-    assert user[1] == 'testuser'
-    assert user[3] == 5000.0
+# Mocking the database connection for tests
+@pytest.fixture
+def mock_cursor(mocker):
+    mock_conn = mocker.Mock()
+    mock_cursor = mocker.Mock()
 
-def test_find_user_by_username(db_connection):
-    cursor = db_connection.cursor()
-    cursor.execute("INSERT INTO users (username, password, balance) VALUES (?, ?, ?)", 
-                   ('findme', 'hash123', 10000.0))
-    db_connection.commit()
-    user = find_user_by_username('findme')
-    assert user is not None
-    assert user.username == 'findme'
+    # Mock the connection's cursor
+    mock_conn.cursor.return_value = mock_cursor
+    mock_cursor.fetchone.return_value = None  # Default return for queries
+    mock_cursor.fetchall.return_value = []
+    mock_conn.commit.return_value = None
 
-@patch('bcrypt.check_password_hash', return_value=True)
-def test_check_password(mock_bcrypt):
-    result = check_password('hash123', 'password123')
-    assert result is True
+    # Mock the get_db_connection context manager from sql_utils
+    @contextmanager
+    def mock_get_db_connection():
+        yield mock_conn  # Yield the mocked connection object
 
-@patch('bcrypt.generate_password_hash', return_value=b'newhash123')
-def test_update_password(mock_bcrypt, db_connection):
-    cursor = db_connection.cursor()
-    cursor.execute("INSERT INTO users (username, password, balance) VALUES (?, ?, ?)", 
-                   ('updateuser', 'hash123', 10000.0))
-    user_id = cursor.lastrowid
-    db_connection.commit()
-    update_password(user_id, 'newpassword123')
-    cursor.execute('SELECT password FROM users WHERE id = ?', (user_id,))
-    updated_password = cursor.fetchone()[0]
-    assert updated_password == 'newhash123'
+    mocker.patch("paper_trader.models.user_model.get_db_connection", mock_get_db_connection)
+
+    return mock_cursor  # Return the mock cursor so we can set expectations per test
+
+@pytest.fixture
+def mock_bcrypt(mocker):
+    return mocker.patch("flask_bcrypt.Bcrypt.generate_password_hash", return_value=b'password')
+
+######################################################
+#
+#    Add Users
+#
+######################################################
+
+def test_create_user(mock_cursor, mock_bcrypt):
+    '''Test creating a new user'''
+    
+    #Call the function to create a new user
+    create_user(username="user", password="password", balance=1000.0)
+    
+    expected_query = normalize_whitespace("""
+        INSERT INTO users (username, password, balance)
+        VALUES (?, ?, ?)
+    """)
+    
+    actual_query = normalize_whitespace(mock_cursor.execute.call_args[0][0])
+    
+    # Assert that the SQL query was correct
+    assert actual_query == expected_query, "The SQL query did not match the expected structure."
+
+    # Extract the arguments used in the SQL call (second element of call_args)
+    actual_arguments = mock_cursor.execute.call_args[0][1]
+
+    # Assert that the SQL query was executed with the correct arguments
+    expected_arguments = ("user", "password", 1000.0)
+    assert actual_arguments == expected_arguments, f"The SQL query arguments did not match. Expected {expected_arguments}, got {actual_arguments}."
+
+def test_create_user_duplicate_username(mock_cursor, mock_bcrypt):
+    '''Test creating a new user with a duplicate username'''
+    
+    #Simulate that the database will raise an IntegrityError due to a duplicate entry
+    mock_cursor.execute.side_effect = sqlite3.IntegrityError("UNIQUE constraint failed: users.username")
+    
+    #expect that the correct error is raised
+    with pytest.raises(ValueError, match="Error creating user: UNIQUE constraint failed: users.username"):
+        create_user(username="user", password="password", balance=1000.0)

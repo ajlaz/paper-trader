@@ -5,7 +5,7 @@ from flask import Flask, jsonify, make_response, Response, request
 
 from paper_trader.models import user_stock_model
 from paper_trader.models.user_model import User, create_user, find_user_by_username, update_password, check_password
-from utils.stocks import quote_stock_by_symbol
+from paper_trader.utils.stocks import quote_stock_by_symbol
 
 # Load environment variables
 load_dotenv()

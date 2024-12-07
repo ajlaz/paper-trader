@@ -1,8 +1,14 @@
 from dataclasses import dataclass
 import sqlite3
+import logging
+from paper_trader.utils.sql_utils import get_db_connection
+from paper_trader.utils.logger import configure_logger
 from flask_bcrypt import Bcrypt
 
 bcrypt = Bcrypt()
+
+logger = logging.getLogger(__name__)
+configure_logger(logger)
 
 @dataclass
 class User:
@@ -11,55 +17,58 @@ class User:
     password: str
     balance: float
 
-def create_table():
-    '''
-    Create the users table if it doesn't already exist
-    '''
-    connection = sqlite3.connect('db/paper-trader.db')
-    cursor = connection.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    balance REAL DEFAULT 10000.0
-        )
-    '''
-    )
-    connection.commit()
-    connection.close()
-
 def create_user(username: str, password: str, balance: float):
     '''
     Create a new user with a hashed password
     '''
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    connection = sqlite3.connect('db/paper-trader.db')
-    cursor = connection.cursor()
     try:
-        cursor.execute('''
-            INSERT INTO users (username, password, balance) VALUES (?, ?, ?)
-            ''', (username, hashed_password, balance))
-        connection.commit()
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (username, password, balance) VALUES (?, ?, ?)
+                ''', (username, hashed_password, balance))
+            conn.commit()
     except sqlite3.IntegrityError as e:
-        connection.close()
-        raise ValueError(f"Error creating user: {e}")
-    connection.close()
+        logger.error("user with username %s already exists", username)
+        raise ValueError(f"Error creating user: {e}") from e
+    
 
 def find_user_by_username(username: str):
     '''
     Find a user by their username
     '''
-    connection = sqlite3.connect('db/paper-trader.db')
-    cursor = connection.cursor()
-    cursor.execute('SELECT id, username, password, balance FROM users WHERE username = ?', (username,))
-    user = cursor.fetchone()
-    connection.close()
-    if user:
-        return User(*user)
-    return None
+    try:
+        with get_db_connection as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, username, password, balance FROM users WHERE username = ?', (username,))
+            user = cursor.fetchone()
+            conn.close()
+            if user:
+                return User(*user)
+            return None
+    except sqlite3.Error as e:
+        logger.error("Database error finding user by username %s", username)
+        raise ValueError(f"Error finding user: {e}") from e
 
-def check_password(old_password: str, new_password: str) -> bool:
+def find_user_by_id(user_id: int):
+    '''
+    Find a user by their id
+    '''
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id, username, password, balance FROM users WHERE id = ?', (user_id,))
+            user = cursor.fetchone()
+            conn.close()
+            if user:
+                return User(*user)
+            return None
+    except sqlite3.Error as e:
+        logger.error("Database error finding user by id %s", user_id)
+        raise ValueError(f"Error finding user: {e}") from e
+
+def check_password(old_password:str, new_password: str) -> bool:
     '''
     Check if the provided password matches the stored hashed password
     '''
@@ -70,8 +79,11 @@ def update_password(user_id: int, new_password: str):
     Update a user's password
     '''
     hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
-    connection = sqlite3.connect('db/paper-trader.db')
-    cursor = connection.cursor()
-    cursor.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_password, user_id))
-    connection.commit()
-    connection.close()
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE users SET password = ? WHERE id = ?', (hashed_password, user_id))
+            conn.commit()
+    except sqlite3.Error as e:
+        logger.error("Database error updating password for user %s", user_id)
+        raise ValueError(f"Error updating password: {e}") from e
