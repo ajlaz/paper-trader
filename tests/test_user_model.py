@@ -3,16 +3,6 @@ import sqlite3
 from unittest.mock import patch
 from paper_trader.models.user_model import create_table, create_user, find_user_by_username, check_password, update_password
 
-import unittest
-
-class TestUserModel(unittest.TestCase):
-    def test_sample(self):
-        self.assertEqual(1 + 1, 2)
-
-if __name__ == "__main__":
-    unittest.main()
-
-
 @pytest.fixture(scope="module")
 def db_connection():
     connection = sqlite3.connect(":memory:")
