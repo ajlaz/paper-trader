@@ -3,8 +3,8 @@ import http
 import os
 from flask import Flask, jsonify, make_response, Response, request
 
+from paper_trader.models.user_model import create_user, find_user_by_username, update_password, check_password
 from paper_trader.models import user_stock_model
-from paper_trader.models.user_model import User, create_user, find_user_by_username, update_password, check_password
 from paper_trader.utils.stocks import quote_stock_by_symbol
 
 # Load environment variables
@@ -14,23 +14,22 @@ app = Flask(__name__)
 
 
 # Health Checks
-@app.route('/health', methods=['GET'])
+@app.route("/health", methods=["GET"])
 def healthcheck():
     '''
     Health Check to ensure the service is running and healthy
-    
+
     Returns:
         JSON response indicating the status of the service
     '''
-    res = {
-        'status': 'ok'
-        }
-    
-    app.logger.info('Health Check')
+    res = {"status": "ok"}
+
+    app.logger.info("Health Check")
     return make_response(jsonify(res), http.HTTPStatus.OK)
 
+
 # Authentication
-@app.route('/auth/login', methods=['POST'])
+@app.route("/auth/login", methods=["POST"])
 def login():
     '''
     Login endpoint to authenticate the user
@@ -53,7 +52,8 @@ def login():
     app.logger.warning('Login failed for username: %s', username)
     return make_response(jsonify({'error': 'Invalid username or password'}), http.HTTPStatus.UNAUTHORIZED)
 
-@app.route('/auth/create-account', methods=['POST'])
+
+@app.route("/auth/create-account", methods=["POST"])
 def register():
     '''
     Register endpoint to create a new user
@@ -107,31 +107,85 @@ def change_password():
     return make_response(jsonify({'error': 'Invalid username or password'}), http.HTTPStatus.UNAUTHORIZED)
 
 # Stock Management
-@app.route('/stocks/buy', methods=['POST'])
+@app.route("/stocks/buy", methods=["POST"])
 def buy_stock():
     '''
     Buy endpoint to purchase stock
-    
-    Returns:
-        JSON response indicating the status of the purchase
     '''
-    pass
+    data = request.json
+    user_id = data.get("user_id")
+    symbol = data.get("symbol")
+    quantity = data.get("quantity")
 
-@app.route('/stocks/sell', methods=['POST'])
+    if not user_id or not symbol or not quantity:
+        return make_response(
+            jsonify({"error": "Missing required fields"}), http.HTTPStatus.BAD_REQUEST
+        )
+    if quantity <= 0:
+        return make_response(
+            jsonify({"error": "Quantity must be greater than 0"}),
+            http.HTTPStatus.BAD_REQUEST,
+        )
+
+    try:
+        new_balance = user_stock_model.buy_stock(user_id, symbol, quantity)
+        return make_response(
+            jsonify(
+                {"message": "Stock purchased successfully", "balance": new_balance}
+            ),
+            http.HTTPStatus.OK,
+        )
+    except ValueError as e:
+        return make_response(jsonify({"error": str(e)}), http.HTTPStatus.BAD_REQUEST)
+    except Exception as e:
+        app.logger.error("Unexpected error: %s", str(e))
+        return make_response(
+            jsonify({"error": "Internal server error"}),
+            http.HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+
+
+@app.route("/stocks/sell", methods=["POST"])
 def sell_stock():
     '''
     Sell endpoint to sell stock
-    
-    Returns:
-        JSON response indicating the status of the sale
     '''
-    pass
+    data = request.json
+    user_id = data.get("user_id")
+    symbol = data.get("symbol")
+    quantity = data.get("quantity")
 
-@app.route('/stocks/quote/<stock>', methods=['GET'])
+    if not user_id or not symbol or not quantity:
+        return make_response(
+            jsonify({"error": "Missing required fields"}), http.HTTPStatus.BAD_REQUEST
+        )
+    if quantity <= 0:
+        return make_response(
+            jsonify({"error": "Quantity must be greater than 0"}),
+            http.HTTPStatus.BAD_REQUEST,
+        )
+
+    try:
+        new_balance = user_stock_model.sell_stock(user_id, symbol, quantity)
+        return make_response(
+            jsonify({"message": "Stock sold successfully", "balance": new_balance}),
+            http.HTTPStatus.OK,
+        )
+    except ValueError as e:
+        return make_response(jsonify({"error": str(e)}), http.HTTPStatus.BAD_REQUEST)
+    except Exception as e:
+        app.logger.error("Unexpected error: %s", str(e))
+        return make_response(
+            jsonify({"error": "Internal server error"}),
+            http.HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+
+
+@app.route("/stocks/quote/<stock>", methods=["GET"])
 def get_stock_quote(stock):
     '''
     Get stock quote for a given stock
-    
+
     Returns:
         JSON response containing the stock quote
     '''
@@ -139,27 +193,31 @@ def get_stock_quote(stock):
         quote = quote_stock_by_symbol(stock)
         return make_response(jsonify(quote), http.HTTPStatus.OK)
     except ValueError:
-        return make_response(jsonify({'error': 'Invalid stock symbol'}), http.HTTPStatus.BAD_REQUEST)
+        return make_response(
+            jsonify({"error": "Invalid stock symbol"}), http.HTTPStatus.BAD_REQUEST
+        )
 
-@app.route('/stocks/portfolio', methods=['GET'])
+
+@app.route("/stocks/portfolio", methods=["GET"])
 def get_portfolio():
     '''
     Get the portfolio of the user
-    
+
     Returns:
         JSON response containing the user's portfolio
     '''
     pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # check if HTTP variables are set in the environment
-    if os.getenv('HTTP_HOST'):
-        host = os.getenv('HTTP_HOST')
+    if os.getenv("HTTP_HOST"):
+        host = os.getenv("HTTP_HOST")
     else:
-        host = '0.0.0.0'
-    if os.getenv('HTTP_PORT'):
-        port = int(os.getenv('HTTP_PORT'))
+        host = "0.0.0.0"
+    if os.getenv("HTTP_PORT"):
+        port = int(os.getenv("HTTP_PORT"))
     else:
         port = 5000
-        
+
     app.run(debug=True, host=host, port=port)
