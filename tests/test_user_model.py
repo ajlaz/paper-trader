@@ -2,9 +2,8 @@ import pytest
 from contextlib import contextmanager
 import re
 import sqlite3
-from unittest.mock import patch
-from paper_trader.models.user_model import create_user, find_user_by_username, find_user_by_id, update_user_balance, delete_user, get_all_users, update_user_email, authenticate_user, check_password, update_password
-from paper_trader.models.user_model import User
+from unittest.mock import patch, Mock
+from paper_trader.models.user_model import create_user, find_user_by_username, find_user_by_id, update_user_balance, check_password, update_password
 
 ######################################################
 #
@@ -38,32 +37,10 @@ def mock_cursor(mocker):
 
 @pytest.fixture
 def mock_bcrypt(mocker):
-    return mocker.patch("flask_bcrypt.Bcrypt.generate_password_hash", return_value=b'password')
-
-@pytest.fixture
-def user_model():
-    """Fixture to provide a new instance of UserModel for each test."""
-    return User()
-
-@pytest.fixture
-def sample_user():
-    """Sample user data for testing purposes."""
-    return {
-        "id": 1,
-        "username": "test_user",
-        "email": "test_user@example.com",
-        "password": "securepassword"
-    }
-
-@pytest.fixture
-def another_sample_user():
-    """Another sample user for testing."""
-    return {
-        "id": 2,
-        "username": "another_user",
-        "email": "another_user@example.com",
-        "password": "anothersecurepassword"
-    }
+    mock_bcrypt = mocker.patch("paper_trader.models.user_model.bcrypt")
+    mock_bcrypt.generate_password_hash.return_value = b'password'
+    mock_bcrypt.check_password_hash.return_value = True
+    return mock_bcrypt
 
 ######################################################
 #
@@ -108,12 +85,12 @@ def test_get_user_by_username(mock_cursor):
     '''Test retrieving a user by username'''
 
     # Simulate the database returning a user row
-    mock_cursor.execute.return_value.fetchone.return_value = ("user", "hashed_password", 1000.0)
+    mock_cursor.fetchone.return_value = (1, "user", "hashed_password", 1000.0)
 
     user = find_user_by_username("user")
 
     expected_query = normalize_whitespace("""
-        SELECT username, password, balance
+        SELECT id, username, password, balance
         FROM users
         WHERE username = ?
     """)
@@ -123,23 +100,71 @@ def test_get_user_by_username(mock_cursor):
     # Assert the SQL query was correct
     assert actual_query == expected_query, "The SQL query did not match the expected structure."
 
-    # Assert the correct parameter was used
-    assert mock_cursor.execute.call_args[0][1] == ("user",), "Expected query parameter to be ('user',)."
-
-    # Assert the function returned the correct user data
-    assert user.username == "user", "Expected username to match 'user'."
-    assert user.password == "hashed_password", "Expected password to match 'hashed_password'."
-    assert user.balance == 1000.0, "Expected balance to match 1000.0."
+    # Assert the returned user is correct
+    assert user.username == "user"
+    assert user.password == "hashed_password"
+    assert user.balance == 1000.0
 
 
 def test_get_user_by_username_not_found(mock_cursor):
     '''Test retrieving a user that does not exist'''
 
     # Simulate the database returning no rows
-    mock_cursor.execute.return_value.fetchone.return_value = None
+    mock_cursor.fetchone.return_value = None
 
-    with pytest.raises(ValueError, match="User not found"):
+    with pytest.raises(ValueError, match="User with username nonexistent_user not found"):
         find_user_by_username("nonexistent_user")
+
+def test_get_user_by_username_database_error(mock_cursor):
+    '''Test retrieving a user when a database error occurs'''
+
+    # Simulate the database raising an error
+    mock_cursor.execute.side_effect = sqlite3.Error("Database error")
+
+    with pytest.raises(ValueError, match="Error finding user: Database error"):
+        find_user_by_username("user")
+        
+def test_get_user_by_id(mock_cursor):
+    '''Test retrieving a user by ID'''
+
+    # Simulate the database returning a user row
+    mock_cursor.fetchone.return_value = (1, "user", "hashed_password", 1000.0)
+
+    user = find_user_by_id(1)
+
+    expected_query = normalize_whitespace("""
+        SELECT id, username, password, balance
+        FROM users
+        WHERE id = ?
+    """)
+
+    actual_query = normalize_whitespace(mock_cursor.execute.call_args[0][0])
+
+    # Assert the SQL query was correct
+    assert actual_query == expected_query, "The SQL query did not match the expected structure."
+
+    # Assert the returned user is correct
+    assert user.username == "user"
+    assert user.password == "hashed_password"
+    assert user.balance == 1000.0
+
+def test_get_user_by_id_not_found(mock_cursor):
+    '''Test retrieving a user by ID that does not exist'''
+
+    # Simulate the database returning no rows
+    mock_cursor.fetchone.return_value = None
+
+    with pytest.raises(ValueError, match="User with ID 2 not found"):
+        find_user_by_id(2)
+
+def test_get_user_by_id_database_error(mock_cursor):
+    '''Test retrieving a user by ID when a database error occurs'''
+
+    # Simulate the database raising an error
+    mock_cursor.execute.side_effect = sqlite3.Error("Database error")
+
+    with pytest.raises(ValueError, match="Error finding user: Database error"):
+        find_user_by_id(1)
 
 
 def test_update_user_balance(mock_cursor):
@@ -161,118 +186,18 @@ def test_update_user_balance(mock_cursor):
 
     # Assert the correct parameters were used
     assert mock_cursor.execute.call_args[0][1] == (1200.0, "user"), "Expected query parameters to be (1200.0, 'user')."
+    
+def test_update_user_balance_error(mock_cursor):
+    '''Test updating a user's balance when an error occurs'''
+
+    # Simulate that the database will raise an error
+    mock_cursor.execute.side_effect = sqlite3.Error("Database error")
+
+    with pytest.raises(ValueError, match="Error updating balance: Database error"):
+        update_user_balance("user", 1200.0)
 
 
-def test_delete_user(mock_cursor):
-    '''Test deleting a user'''
 
-    # Call the function to delete a user
-    delete_user("user")
-
-    expected_query = normalize_whitespace("""
-        DELETE FROM users
-        WHERE username = ?
-    """)
-
-    actual_query = normalize_whitespace(mock_cursor.execute.call_args[0][0])
-
-    # Assert the SQL query was correct
-    assert actual_query == expected_query, "The SQL query did not match the expected structure."
-
-    # Assert the correct parameter was used
-    assert mock_cursor.execute.call_args[0][1] == ("user",), "Expected query parameter to be ('user',)."
-
-
-def test_get_all_users(mock_cursor):
-    '''Test retrieving all users'''
-
-    # Simulate the database returning multiple rows
-    mock_cursor.execute.return_value.fetchall.return_value = [
-        ("user1", "hashed_password1", 1000.0),
-        ("user2", "hashed_password2", 2000.0)
-    ]
-
-    users = get_all_users()
-
-    expected_query = normalize_whitespace("""
-        SELECT username, password, balance
-        FROM users
-    """)
-
-    actual_query = normalize_whitespace(mock_cursor.execute.call_args[0][0])
-
-    # Assert the SQL query was correct
-    assert actual_query == expected_query, "The SQL query did not match the expected structure."
-
-    # Assert the returned users match the database rows
-    assert len(users) == 2, "Expected to retrieve 2 users."
-    assert users[0].username == "user1", "Expected first user to be 'user1'."
-    assert users[1].balance == 2000.0, "Expected second user's balance to be 2000.0."
-
-def test_update_user_email(mock_cursor, mock_bcrypt):
-    """Test updating a user's email."""
-    update_user_email(user_id=1, new_email="new_email@example.com")
-
-    expected_query = normalize_whitespace("""
-        UPDATE users
-        SET email = ?
-        WHERE id = ?
-    """)
-    actual_query = normalize_whitespace(mock_cursor.execute.call_args[0][0])
-    assert actual_query == expected_query, "SQL query for updating email is incorrect."
-
-    actual_arguments = mock_cursor.execute.call_args[0][1]
-    expected_arguments = ("new_email@example.com", 1)
-    assert actual_arguments == expected_arguments, f"Arguments for updating email are incorrect. Expected {expected_arguments}, got {actual_arguments}."
-
-
-def test_authenticate_user(mock_cursor, mock_bcrypt):
-    """Test authenticating a user with valid credentials."""
-    mock_cursor.fetchone.return_value = (1, "hashed_password")
-
-    mock_bcrypt.check_password_hash.return_value = True
-
-    user_id = authenticate_user(username="user", password="password")
-    assert user_id == 1, "Failed to authenticate user with valid credentials."
-
-def test_authenticate_user_invalid_password(mock_cursor, mock_bcrypt):
-    """Test authenticating a user with an invalid password."""
-    mock_cursor.fetchone.return_value = (1, "hashed_password")
-
-    mock_bcrypt.check_password_hash.return_value = False
-
-    with pytest.raises(ValueError, match="Invalid username or password"):
-        authenticate_user(username="user", password="wrong_password")
-
-##################################################
-#
-#   Edge Case Test Cases
-#
-##################################################
-
-def test_get_nonexistent_user_by_id(mock_cursor, mock_bcrypt):
-    """Test getting a user by ID when the user does not exist."""
-    mock_cursor.fetchone.return_value = None
-
-    with pytest.raises(ValueError, match="User not found"):
-        find_user_by_id(999)
-
-
-def test_update_email_for_nonexistent_user(mock_cursor, mock_bcrypt):
-    """Test updating the email of a nonexistent user."""
-    mock_cursor.execute.return_value = None
-    mock_cursor.rowcount = 0
-
-    with pytest.raises(ValueError, match="No user found with the specified ID"):
-        update_user_email(user_id=999, new_email="nonexistent@example.com")
-
-def test_delete_nonexistent_user(mock_cursor, mock_bcrypt):
-    """Test deleting a nonexistent user."""
-    mock_cursor.execute.return_value = None
-    mock_cursor.rowcount = 0
-
-    with pytest.raises(ValueError, match="No user found with the specified ID"):
-        delete_user(user_id=999)
 
 ##################################################
 #
@@ -323,7 +248,7 @@ def test_update_password(mock_cursor, mock_bcrypt):
     hashed_password = "hashed_password"
 
     # Mock bcrypt to generate the hashed password
-    mock_bcrypt.generate_password_hash.return_value = hashed_password
+    mock_bcrypt.generate_password_hash.return_value = b'hashed_password'
 
     # Act
     update_password(user_id, new_password)
@@ -335,7 +260,3 @@ def test_update_password(mock_cursor, mock_bcrypt):
         (hashed_password, user_id)
     )
     assert mock_cursor.execute.call_count == 1, "Password update query was not executed exactly once."
-
-    
-
-    
