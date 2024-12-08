@@ -3,13 +3,8 @@ import http
 import os
 from flask import Flask, jsonify, make_response, Response, request
 
-from paper_trader.models.user_stock_model import (
-    find_stock_by_user_and_symbol,
-    update_stock_quantity,
-    add_new_stock,
-    remove_stock,
-)
-from paper_trader.models.user_model import User, create_user, find_user_by_username, update_password, check_password, find_user_by_id, update_user_balance
+from paper_trader.models.user_model import create_user, find_user_by_username, update_password, check_password
+from paper_trader.models import user_stock_model
 from paper_trader.utils.stocks import quote_stock_by_symbol
 
 # Load environment variables
@@ -21,12 +16,12 @@ app = Flask(__name__)
 # Health Checks
 @app.route("/health", methods=["GET"])
 def healthcheck():
-    """
+    '''
     Health Check to ensure the service is running and healthy
 
     Returns:
         JSON response indicating the status of the service
-    """
+    '''
     res = {"status": "ok"}
 
     app.logger.info("Health Check")
@@ -36,7 +31,7 @@ def healthcheck():
 # Authentication
 @app.route("/auth/login", methods=["POST"])
 def login():
-    """
+    '''
     Login endpoint to authenticate the user
 
     Expects:
@@ -60,7 +55,7 @@ def login():
 
 @app.route("/auth/create-account", methods=["POST"])
 def register():
-    """
+    '''
     Register endpoint to create a new user
 
     Expects: 
@@ -114,9 +109,9 @@ def change_password():
 # Stock Management
 @app.route("/stocks/buy", methods=["POST"])
 def buy_stock():
-    """
+    '''
     Buy endpoint to purchase stock
-    """
+    '''
     data = request.json
     user_id = data.get("user_id")
     symbol = data.get("symbol")
@@ -152,9 +147,9 @@ def buy_stock():
 
 @app.route("/stocks/sell", methods=["POST"])
 def sell_stock():
-    """
+    '''
     Sell endpoint to sell stock
-    """
+    '''
     data = request.json
     user_id = data.get("user_id")
     symbol = data.get("symbol")
@@ -188,12 +183,12 @@ def sell_stock():
 
 @app.route("/stocks/quote/<stock>", methods=["GET"])
 def get_stock_quote(stock):
-    """
+    '''
     Get stock quote for a given stock
 
     Returns:
         JSON response containing the stock quote
-    """
+    '''
     try:
         quote = quote_stock_by_symbol(stock)
         return make_response(jsonify(quote), http.HTTPStatus.OK)
@@ -205,12 +200,12 @@ def get_stock_quote(stock):
 
 @app.route("/stocks/portfolio", methods=["GET"])
 def get_portfolio():
-    """
+    '''
     Get the portfolio of the user
 
     Returns:
         JSON response containing the user's portfolio
-    """
+    '''
     pass
 
 
