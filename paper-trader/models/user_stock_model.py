@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 import sqlite3
 import logging
+from paper_trader.models.user_model import find_user_by_id, update_user_balance
 from paper_trader.utils.sql_utils import get_db_connection
 from paper_trader.utils.logger import configure_logger
+from paper_trader.utils.stocks import quote_stock_by_symbol
 
 logger = logging.getLogger(__name__)
 configure_logger(logger)
@@ -96,3 +98,71 @@ def remove_stock(stock_id: int):
     except sqlite3.Error as e:
         logger.error("Database error removing stock %s", stock_id)
         raise ValueError(f"Error removing stock: {e}") from e
+
+
+def buy_stock(user_id: int, symbol: str, quantity: float):
+    """
+    Handles the business logic for buying stocks
+    """
+    # Get user details
+    user = find_user_by_id(user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    # Fetch stock price
+    quote = quote_stock_by_symbol(symbol)
+    stock_price = float(quote["05. price"])
+
+    # Calculate total cost
+    total_cost = stock_price * quantity
+
+    # Check user's balance
+    if user.balance < total_cost:
+        raise ValueError("Insufficient balance")
+
+    # Find existing stock or add a new one
+    stock = find_stock_by_user_and_symbol(user_id, symbol)
+    if stock:
+        new_quantity = stock.quantity + quantity
+        update_stock_quantity(stock.id, new_quantity)
+    else:
+        add_new_stock(user_id, symbol, stock_price, quantity)
+
+    # Deduct cost from user's balance
+    new_balance = user.balance - total_cost
+    update_user_balance(user_id, new_balance)
+
+    return new_balance
+
+
+def sell_stock(user_id: int, symbol: str, quantity: float):
+    """
+    Handles the business logic for selling stocks
+    """
+    # Get user details
+    user = find_user_by_id(user_id)
+    if not user:
+        raise ValueError("User not found")
+
+    # Find the user's stock
+    stock = find_stock_by_user_and_symbol(user_id, symbol)
+    if not stock or stock.quantity < quantity:
+        raise ValueError("Insufficient stock quantity")
+
+    # Calculate revenue from the sale
+    quote = quote_stock_by_symbol(symbol)
+    stock_price = float(quote["05. price"])
+    revenue = stock_price * quantity
+
+    # Update stock quantity or remove the stock
+    new_quantity = stock.quantity - quantity
+    if new_quantity > 0:
+        update_stock_quantity(stock.id, new_quantity)
+    else:
+        remove_stock(stock.id)
+
+    # Update user's balance
+    new_balance = user.balance + revenue
+    update_user_balance(user_id, new_balance)
+
+    return new_balance
