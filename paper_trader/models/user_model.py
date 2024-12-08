@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 from dataclasses import dataclass
 import sqlite3
 import logging
@@ -185,3 +186,5 @@ def update_password(user_id: int, new_password: str):
     except sqlite3.Error as e:
         logger.error("Database error updating password for user %s", user_id)
         raise ValueError(f"Error updating password: {e}") from e
+=======
+>>>>>>> 90e6705 (Finalized: user_model and test_user_model)
