@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from utils.stocks import quote_stock_by_symbol
+from paper_trader.utils.stocks import quote_stock_by_symbol
 
 RANDOM_SYMBOL = 'AAPL'
 
