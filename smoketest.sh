@@ -156,10 +156,13 @@ check_db
 
 # User management
 create_user "testuser" "testpassword"
+create_user "testuser2" "testpassword2"
 login_user "testuser" "testpassword"
 change_password "testuser" "testpassword" "newpassword"
+login_user "testuser" "newpassword"
 
 # Stock management
 buy_stock 1 "AAPL" 10
 sell_stock 1 "AAPL" 5
+sell_stock 1 "AAPL" 2
 get_portfolio 1
