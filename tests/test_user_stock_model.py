@@ -41,10 +41,20 @@ def mock_cursor(mocker):
         yield mock_conn  # Yield the mocked connection object
 
     mocker.patch(
-        "paper_trader.utils.sql_utils.get_db_connection", mock_get_db_connection
+        "paper_trader.models.user_model.get_db_connection", mock_get_db_connection
+    )
+    mocker.patch(
+        "paper_trader.models.user_stock_model.get_db_connection", mock_get_db_connection
     )
 
     return mock_cursor  # Return the mock cursor so we can set expectations per test
+
+@pytest.fixture
+def mock_quote(mocker):
+    mock_quote = mocker.patch("paper_trader.models.user_stock_model.quote_stock_by_symbol")
+    mock_quote.return_value = {"05. price": "150.0"}
+    return mock_quote
+    
 
 
 ######################################################
@@ -54,7 +64,7 @@ def mock_cursor(mocker):
 ######################################################
 
 
-def test_buy_new_stock(mock_cursor):
+def test_buy_new_stock(mock_cursor, mock_quote):
     """Test buying a new stock for a user."""
     # Mock stock price from API
     mock_cursor.fetchone.side_effect = [
@@ -62,11 +72,8 @@ def test_buy_new_stock(mock_cursor):
         None,  # No existing stock
     ]
 
-    with patch(
-        "paper_trader.models.user_stock_model.quote_stock_by_symbol",
-        return_value={"05. price": "150.00"},
-    ):
-        new_balance = buy_stock(user_id=1, symbol="GOOG", quantity=2)
+    
+    new_balance = buy_stock(user_id=1, symbol="GOOG", quantity=2)
 
     # Check SQL queries
     expected_user_query = normalize_whitespace(
@@ -103,18 +110,14 @@ def test_buy_new_stock(mock_cursor):
     assert new_balance == 700.0, "Final balance mismatch."
 
 
-def test_buy_existing_stock(mock_cursor):
+def test_buy_existing_stock(mock_cursor, mock_quote):
     """Test buying more of an existing stock."""
     mock_cursor.fetchone.side_effect = [
         (1, "test_user", "hashed_password", 1000.0),  # User data
         (1, 1, "AAPL", 150.0, 10),  # Existing stock
     ]
 
-    with patch(
-        "paper_trader.models.user_stock_model.quote_stock_by_symbol",
-        return_value={"05. price": "150.00"},
-    ):
-        new_balance = buy_stock(user_id=1, symbol="AAPL", quantity=5)
+    new_balance = buy_stock(user_id=1, symbol="AAPL", quantity=5)
 
     # Assert stock quantity update
     expected_update_query = normalize_whitespace(
@@ -144,16 +147,13 @@ def test_buy_existing_stock(mock_cursor):
     assert new_balance == 250.0, "Final balance mismatch."
 
 
-def test_buy_stock_insufficient_balance(mock_cursor):
+def test_buy_stock_insufficient_balance(mock_cursor, mock_quote):
     """Test buying stock when user has insufficient balance."""
     mock_cursor.fetchone.side_effect = [
         (1, "test_user", "hashed_password", 100.0),  # User data
     ]
 
-    with patch(
-        "paper_trader.models.user_stock_model.quote_stock_by_symbol",
-        return_value={"05. price": "150.00"},
-    ), pytest.raises(ValueError, match="Insufficient balance"):
+    with pytest.raises(ValueError, match="Insufficient balance"):
         buy_stock(user_id=1, symbol="AAPL", quantity=5)
 
 
@@ -164,18 +164,14 @@ def test_buy_stock_insufficient_balance(mock_cursor):
 ######################################################
 
 
-def test_sell_stock_partial(mock_cursor):
+def test_sell_stock_partial(mock_cursor, mock_quote):
     """Test selling part of a stock holding."""
     mock_cursor.fetchone.side_effect = [
         (1, "test_user", "hashed_password", 1000.0),  # User data
         (1, 1, "AAPL", 150.0, 10),  # Existing stock
     ]
 
-    with patch(
-        "paper_trader.models.user_stock_model.quote_stock_by_symbol",
-        return_value={"05. price": "150.00"},
-    ):
-        new_balance = sell_stock(user_id=1, symbol="AAPL", quantity=5)
+    new_balance = sell_stock(user_id=1, symbol="AAPL", quantity=5)
 
     # Assert stock quantity update
     expected_update_query = normalize_whitespace(
@@ -205,18 +201,14 @@ def test_sell_stock_partial(mock_cursor):
     assert new_balance == 1750.0, "Final balance mismatch."
 
 
-def test_sell_stock_full(mock_cursor):
+def test_sell_stock_full(mock_cursor, mock_quote):
     """Test selling all stock holdings."""
     mock_cursor.fetchone.side_effect = [
         (1, "test_user", "hashed_password", 1000.0),  # User data
         (1, 1, "AAPL", 150.0, 10),  # Existing stock
     ]
 
-    with patch(
-        "paper_trader.models.user_stock_model.quote_stock_by_symbol",
-        return_value={"05. price": "150.00"},
-    ):
-        new_balance = sell_stock(user_id=1, symbol="AAPL", quantity=10)
+    new_balance = sell_stock(user_id=1, symbol="AAPL", quantity=10)
 
     # Assert stock deletion
     expected_delete_query = normalize_whitespace("DELETE FROM user_stocks WHERE id = ?")
@@ -242,15 +234,12 @@ def test_sell_stock_full(mock_cursor):
     assert new_balance == 2500.0, "Final balance mismatch."
 
 
-def test_sell_stock_insufficient_quantity(mock_cursor):
+def test_sell_stock_insufficient_quantity(mock_cursor, mock_quote):
     """Test selling stock when user does not have enough quantity."""
     mock_cursor.fetchone.side_effect = [
         (1, "test_user", "hashed_password", 1000.0),  # User data
         (1, 1, "AAPL", 150.0, 5),  # Existing stock
     ]
 
-    with patch(
-        "paper_trader.models.user_stock_model.quote_stock_by_symbol",
-        return_value={"05. price": "150.00"},
-    ), pytest.raises(ValueError, match="Insufficient stock quantity"):
+    with pytest.raises(ValueError, match="Insufficient stock quantity"):
         sell_stock(user_id=1, symbol="AAPL", quantity=10)
