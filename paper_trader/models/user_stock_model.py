@@ -166,3 +166,46 @@ def sell_stock(user_id: int, symbol: str, quantity: float):
     update_user_balance(user_id, new_balance)
 
     return new_balance
+
+def get_portfolio(user_id: str):
+    """
+    Gets the user's stock portfolio
+    
+    Args:
+        user_id (str): The user's ID
+    
+    Returns:
+        dict: The user's stock portfolio
+    
+    Raises:
+        ValueError: If the user is not found
+        sqlite3.Error: If there is a database error
+    """
+    
+    try:
+        with get_db_connection() as conn:
+            find_user_by_id(user_id)
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT symbol, bought_price, quantity
+                FROM user_stocks
+                WHERE user_id = ?
+            """,
+                (user_id,),
+            )
+            stocks = cursor.fetchall()
+            portfolio = []
+            for stock in stocks:
+                portfolio.append(
+                    {
+                        "symbol": stock[0],
+                        "bought_price": stock[1],
+                        "quantity": stock[2],
+                    }
+                )
+            return portfolio
+    except sqlite3.Error as e:
+        logger.error("Database error finding user by id %s", user_id)
+        raise ValueError(f"Error finding user: {e}") from e
+            

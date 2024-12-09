@@ -107,13 +107,13 @@ def change_password():
     return make_response(jsonify({'error': 'Invalid username or password'}), http.HTTPStatus.UNAUTHORIZED)
 
 # Stock Management
-@app.route("/stocks/buy", methods=["POST"])
-def buy_stock():
+@app.route("/users/<id>/stocks/buy", methods=["POST"])
+def buy_stock(id):
     '''
     Buy endpoint to purchase stock
     '''
     data = request.json
-    user_id = data.get("user_id")
+    user_id = id
     symbol = data.get("symbol")
     quantity = data.get("quantity")
 
@@ -145,13 +145,13 @@ def buy_stock():
         )
 
 
-@app.route("/stocks/sell", methods=["POST"])
-def sell_stock():
+@app.route("/users/<id>/stocks/sell", methods=["POST"])
+def sell_stock(id):
     '''
     Sell endpoint to sell stock
     '''
     data = request.json
-    user_id = data.get("user_id")
+    user_id = id
     symbol = data.get("symbol")
     quantity = data.get("quantity")
 
@@ -198,15 +198,17 @@ def get_stock_quote(stock):
         )
 
 
-@app.route("/stocks/portfolio", methods=["GET"])
-def get_portfolio():
+@app.route("/users/<id>/stocks/portfolio", methods=["GET"])
+def get_portfolio(id):
     '''
     Get the portfolio of the user
 
     Returns:
         JSON response containing the user's portfolio
     '''
-    pass
+    portfolio = user_stock_model.get_portfolio(id)
+    return make_response(jsonify(portfolio), http.HTTPStatus.OK)
+    
 
 
 if __name__ == "__main__":
