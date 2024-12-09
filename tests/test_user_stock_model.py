@@ -270,11 +270,16 @@ def test_get_portfolio(mock_cursor):
     assert actual_query == expected_query, "Portfolio SELECT query mismatch."
 
     # Assert the correct portfolio data was returned
-    expected_portfolio = [
-        {"symbol": "AAPL", "bought_price": 150.0, "quantity": 5},
-        {"symbol": "GOOG", "bought_price": 200.0, "quantity": 3},
-    ]
-    assert portfolio == expected_portfolio, "Portfolio data mismatch."
+    expected_portfolio = {
+        "username": "test_user",
+        "balance": 1000.0,
+        "total_portfolio_value": 1350.0,
+        "stocks": [
+            {"symbol": "AAPL", "bought_price": 150.0, "quantity": 5, "total_value": 750.0},
+            {"symbol": "GOOG", "bought_price": 200.0, "quantity": 3, "total_value": 600.0},
+        ]
+    }
+    assert expected_portfolio == portfolio, "Portfolio data mismatch."
     
 def test_get_portfolio_no_user(mock_cursor):
     """Test getting a user's stock portfolio when the user does not exist."""
