@@ -6,6 +6,7 @@ from flask import Flask, jsonify, make_response, Response, request
 from paper_trader.models.user_model import create_user, find_user_by_username, update_password, check_password
 from paper_trader.models import user_stock_model
 from paper_trader.utils.stocks import quote_stock_by_symbol
+from paper_trader.utils.sql_utils import check_database_connection
 
 # Load environment variables
 load_dotenv()
@@ -26,6 +27,22 @@ def healthcheck():
 
     app.logger.info("Health Check")
     return make_response(jsonify(res), http.HTTPStatus.OK)
+
+@app.route("/db-check", methods=["GET"])
+def db_check():
+    '''
+    Health Check to ensure the database connection is working
+
+    Returns:
+        JSON response indicating the status of the database connection
+    '''
+    try:
+        check_database_connection()
+        app.logger.info("Database connection is healthy")
+        return make_response(jsonify({"status": "ok"}), http.HTTPStatus.OK)
+    except Exception as e:
+        app.logger.error("Database connection error: %s", str(e))
+        return make_response(jsonify({"status": "error"}), http.HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 # Authentication
@@ -69,9 +86,12 @@ def register():
     password = data.get('password')
     balance = data.get('balance', 100000.0)
 
-    if find_user_by_username(username) is not None:
+    try:
+        find_user_by_username(username)
         app.logger.warning('Registration failed: username %s already exists.', username)
         return make_response(jsonify({'error': 'Username already exists'}), http.HTTPStatus.BAD_REQUEST)
+    except ValueError:
+        pass
     
     user = create_user(username, password, balance)
     app.logger.info('User %s created successfully.', username)
@@ -96,15 +116,18 @@ def change_password():
     old_password = data.get('old_password')
     new_password = data.get('new_password')
 
-    user = find_user_by_username(username)
-    
-    if user and check_password(user.password, old_password):
-        update_password(user.id, new_password)
-        app.logger.info('Password updated for user %s.', username)
-        return make_response(jsonify({'message': 'Password updated successfully'}), http.HTTPStatus.OK)
-    
-    app.logger.warning('Password change failed for username: %s', username)
-    return make_response(jsonify({'error': 'Invalid username or password'}), http.HTTPStatus.UNAUTHORIZED)
+    try:
+        user = find_user_by_username(username)
+        if check_password(user.password, old_password):    
+            update_password(user.id, new_password)
+            app.logger.info('Password updated for user %s.', username)
+            return make_response(jsonify({'message': 'Password updated successfully'}), http.HTTPStatus.OK)
+        app.logger.warning('Password change failed for username: %s', username)
+        return make_response(jsonify({'error': 'Invalid username or password'}), http.HTTPStatus.UNAUTHORIZED)
+    except ValueError:
+        app.logger.warning('User not found: %s', username)
+        return make_response(jsonify({'error': 'User not found'}), http.HTTPStatus.NOT_FOUND)
+        
 
 # Stock Management
 @app.route("/users/<id>/stocks/buy", methods=["POST"])
