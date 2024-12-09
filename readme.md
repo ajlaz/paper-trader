@@ -8,6 +8,13 @@ This is a paper trading app that allows users to simulate trading stocks without
 4. Run `sh run_docker.sh` to build and run the application in a Docker container
 5. The application will now be available at `http://localhost:5002`. Check the [health](http://localhost:5002/health) endpoint to make sure the service is running correctly.
 
+## Running unit tests
+To run the unit tests, run the following commands:
+```bash
+sh setup_venv.sh
+python3 -m pytest . 
+```
+
 
 ## Routes
 
