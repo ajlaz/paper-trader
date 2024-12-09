@@ -7,6 +7,7 @@ import pytest
 from paper_trader.models.user_stock_model import (
     buy_stock,
     sell_stock,
+    get_portfolio,
     UserStock,
 )
 from paper_trader.models.user_model import User
@@ -243,3 +244,48 @@ def test_sell_stock_insufficient_quantity(mock_cursor, mock_quote):
 
     with pytest.raises(ValueError, match="Insufficient stock quantity"):
         sell_stock(user_id=1, symbol="AAPL", quantity=10)
+
+
+######################################################
+#
+#    Portfolio Tests
+#
+######################################################
+
+def test_get_portfolio(mock_cursor):
+    """Test getting a user's stock portfolio."""
+    mock_cursor.fetchone.return_value = (1, "test_user", "hashed_password", 1000.0)
+    mock_cursor.fetchall.return_value = [
+        ("AAPL", 150.0, 5),
+        ("GOOG", 200.0, 3),
+    ]
+
+    portfolio = get_portfolio(user_id=1)
+
+    # Assert the correct SQL query was executed
+    expected_query = normalize_whitespace(
+        "SELECT symbol, bought_price, quantity FROM user_stocks WHERE user_id = ?"
+    )
+    actual_query = normalize_whitespace(mock_cursor.execute.call_args[0][0])
+    assert actual_query == expected_query, "Portfolio SELECT query mismatch."
+
+    # Assert the correct portfolio data was returned
+    expected_portfolio = [
+        {"symbol": "AAPL", "bought_price": 150.0, "quantity": 5},
+        {"symbol": "GOOG", "bought_price": 200.0, "quantity": 3},
+    ]
+    assert portfolio == expected_portfolio, "Portfolio data mismatch."
+    
+def test_get_portfolio_no_user(mock_cursor):
+    """Test getting a user's stock portfolio when the user does not exist."""
+    mock_cursor.fetchone.return_value = None
+
+    with pytest.raises(ValueError, match="User with ID 1 not found"):
+        get_portfolio(user_id=1)
+
+def test_get_portfolio_database_error(mock_cursor):
+    """Test getting a user's stock portfolio when a database error occurs."""
+    mock_cursor.execute.side_effect = sqlite3.Error("Database error")
+
+    with pytest.raises(ValueError, match="Error finding user: Database error"):
+        get_portfolio(user_id=1)
