@@ -81,7 +81,7 @@ def update_user_balance(username, new_balance):
             cursor.execute("""
                 UPDATE users
                 SET balance = ?
-                WHERE username = ?
+                WHERE id = ?
             """, (new_balance, username))
             conn.commit()
     except sqlite3.Error as e:

@@ -171,12 +171,12 @@ def test_update_user_balance(mock_cursor):
     '''Test updating a user's balance'''
 
     # Call the function to update the user's balance
-    update_user_balance("user", 1200.0)
+    update_user_balance(1, 1200.0)
 
     expected_query = normalize_whitespace("""
         UPDATE users
         SET balance = ?
-        WHERE username = ?
+        WHERE id = ?
     """)
 
     actual_query = normalize_whitespace(mock_cursor.execute.call_args[0][0])
@@ -185,7 +185,7 @@ def test_update_user_balance(mock_cursor):
     assert actual_query == expected_query, "The SQL query did not match the expected structure."
 
     # Assert the correct parameters were used
-    assert mock_cursor.execute.call_args[0][1] == (1200.0, "user"), "Expected query parameters to be (1200.0, 'user')."
+    assert mock_cursor.execute.call_args[0][1] == (1200.0, 1), "Expected query parameters to be (1200.0, 'user')."
     
 def test_update_user_balance_error(mock_cursor):
     '''Test updating a user's balance when an error occurs'''
