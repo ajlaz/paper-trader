@@ -4,7 +4,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-def quote_stock_by_symbol(symbol):
+def quote_stock_by_symbol(symbol) -> dict:
     '''
     Get stock quote for a given symbol using the Alpha Vantage API
     

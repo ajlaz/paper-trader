@@ -1,6 +1,14 @@
 # Paper Trader Application
 This is a paper trading app that allows users to simulate trading stocks without risking real money. Users are able to create their account, view their portfolio, and quote, buy, and sell stocks.
 
+## Usage
+1. Clone the repository
+2. Get the required API key from [AlphaVantage](https://www.alphavantage.co/support/#api-key)
+3. create a `.env` file with the same format as `sample.env` and add your API key (or just run `cp sample.env .env` and replace `ALPHA_VANTAGE_API_KEY` with your API key)
+4. Run `sh run_docker.sh` to build and run the application in a Docker container
+5. The application will now be available at `http://localhost:5002`. Check the [health](http://localhost:5002/health) endpoint to make sure the service is running correctly.
+
+
 ## Routes
 
 ### Authentication
@@ -198,7 +206,7 @@ This is a paper trading app that allows users to simulate trading stocks without
 - __Example Request__:
     ```json
     {
-        "username":     "user123",
+        "username": "user123",
         "stock": "AAPL",
         "quantity": 5
     }

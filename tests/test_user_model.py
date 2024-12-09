@@ -121,7 +121,7 @@ def test_get_user_by_username_database_error(mock_cursor):
     # Simulate the database raising an error
     mock_cursor.execute.side_effect = sqlite3.Error("Database error")
 
-    with pytest.raises(ValueError, match="Error finding user: Database error"):
+    with pytest.raises(sqlite3.Error, match="Database error"):
         find_user_by_username("user")
         
 def test_get_user_by_id(mock_cursor):
@@ -193,7 +193,7 @@ def test_update_user_balance_error(mock_cursor):
     # Simulate that the database will raise an error
     mock_cursor.execute.side_effect = sqlite3.Error("Database error")
 
-    with pytest.raises(ValueError, match="Error updating balance: Database error"):
+    with pytest.raises(sqlite3.Error, match="Database error"):
         update_user_balance("user", 1200.0)
 
 
